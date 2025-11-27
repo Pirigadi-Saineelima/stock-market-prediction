@@ -6,21 +6,17 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM
 import plotly.graph_objs as go
-# Import the specific Callback class correctly from tensorflow.keras
 from tensorflow.keras.callbacks import Callback 
 
-# Set page config
+
 st.set_page_config(layout="wide", page_title="Apple Stock Prediction")
-
 st.title(" Apple Stock Price Forecast ")
-st.write("Deep Learning (LSTM) model ")
-# 
+st.write(" Deep Learning (LSTM) model ")
 
-# --- 1. Load Data ---
+
+# Load Data 
 @st.cache_data
 def load_data():
-    # Read the CSV file
-    # Ensure AAPL.csv is in the same folder or provide correct path
     df = pd.read_csv('AAPL.csv')
     return df
 
@@ -32,44 +28,40 @@ except FileNotFoundError:
     st.error("Error: 'AAPL.csv' file not found. Please upload it to your GitHub repository.")
     st.stop()
 
-# --- 2. Preprocessing ---
-# Function to prepare data
+
+# Preprocessing 
 def prepare_data(data, time_step=100):
     X, y = [], []
     for i in range(len(data) - time_step - 1):
-        # Create sequences of 100 previous days (X)
+        
         a = data[i:(i + time_step), 0]
         X.append(a)
-        # The 101st day is the target (y)
+        
         y.append(data[i + time_step, 0])
     return np.array(X), np.array(y)
 
-# Select the 'Close' column for prediction
-df['Date'] = pd.to_datetime(df['Date'], dayfirst=True) # Handle date parsing
+
+df['Date'] = pd.to_datetime(df['Date'], dayfirst=True) 
 df_close = df.reset_index()['Close']
 
-# Scaling
+
 scaler = MinMaxScaler(feature_range=(0, 1))
 df_close_scaled = scaler.fit_transform(np.array(df_close).reshape(-1, 1))
 
-# Split data (We use the whole dataset for training to predict the FUTURE)
+
 training_size = int(len(df_close_scaled) * 0.70)
 test_size = len(df_close_scaled) - training_size
 train_data, test_data = df_close_scaled[0:training_size, :], df_close_scaled[training_size:len(df_close_scaled), :1]
+time_step = 100 
 
-# Parameters
-time_step = 100 # Look back 100 days
-
-# Create datasets
 X_train, y_train = prepare_data(train_data, time_step)
 X_test, y_test = prepare_data(test_data, time_step)
 
-# Reshape for LSTM [samples, time steps, features]
 X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
 X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
 
-# --- 3. Build & Train Model ---
-# We use st.cache_resource to avoid retraining every time the app reloads
+
+# Build & Train Model 
 @st.cache_resource
 def train_model(X_train, y_train):
     model = Sequential()
@@ -79,42 +71,29 @@ def train_model(X_train, y_train):
     model.add(Dense(1))
     model.compile(loss='mean_squared_error', optimizer='adam')
     
-    # Train with a progress bar
+    
     progress_bar = st.progress(0)
     status_text = st.empty()
-    
-    # Custom callback to update streamlit progress
-    # NOTE: The Callback class is imported globally above.
     class StreamlitCallback(Callback):
         def on_epoch_end(self, epoch, logs=None):
-            progress = (epoch + 1) / 20
+            progress = (epoch + 1) / 10
             progress_bar.progress(min(progress, 1.0))
             status_text.text(f"Training Model... Epoch {epoch+1}/10")
-
     model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=10, batch_size=64, verbose=1, callbacks=[StreamlitCallback()])
-    
     status_text.text("Model Trained Successfully!")
     return model
 
+
 if st.button("Train Model & Predict"):
-    # Clear the previous error message if it exists
     if 'error' in st.session_state:
         del st.session_state.error
-        
     with st.spinner("Training the Deep Learning Model... This might take a minute."):
         model = train_model(X_train, y_train)
-
-    # --- 4. Prediction Logic ---
-    # Predictions for validation (Test Set)
     test_predict = model.predict(X_test)
-    
-    # Inverse transform to get actual values
     test_predict = scaler.inverse_transform(test_predict)
-    # y_test_actual is not strictly needed for the plot but good for metrics
-    # y_test_actual = scaler.inverse_transform(y_test.reshape(-1, 1))
+    
 
-    # --- 5. Forecast Next 30 Days ---
-    # Get the last 100 days of data to start the prediction
+    # Forecast Next 30 Days 
     x_input = test_data[len(test_data)-100:].reshape(1, -1)
     temp_input = list(x_input)
     temp_input = temp_input[0].tolist()
@@ -126,7 +105,7 @@ if st.button("Train Model & Predict"):
 
     while(i < days_to_predict):
         if(len(temp_input) > 100):
-            # Take the last 100 values
+           
             x_input = np.array(temp_input[len(temp_input)-100:])
             x_input = x_input.reshape(1, -1)
             x_input = x_input.reshape((1, n_steps, 1))
@@ -143,22 +122,19 @@ if st.button("Train Model & Predict"):
 
     forecast_vals = scaler.inverse_transform(lst_output)
     
-    # --- 6. Visualization ---
+    # Visualization 
     
     st.subheader("Forecast Results")
     
-    # Create future dates
     last_date = df['Date'].iloc[-1]
     future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=30)
     
-    # DataFrame for forecast
     forecast_df = pd.DataFrame({'Date': future_dates, 'Predicted Close': forecast_vals.flatten()})
     st.dataframe(forecast_df)
 
-    # Plotting with Plotly for interactivity
     fig = go.Figure()
 
-    # Original Data (Last 300 days for clarity)
+    
     fig.add_trace(go.Scatter(
         x=df['Date'].iloc[-300:], 
         y=df['Close'].iloc[-300:],
@@ -166,7 +142,7 @@ if st.button("Train Model & Predict"):
         name='Historical Data'
     ))
 
-    # Forecast Data
+
     fig.add_trace(go.Scatter(
         x=future_dates, 
         y=forecast_vals.flatten(),
