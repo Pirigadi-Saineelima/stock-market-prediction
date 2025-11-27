@@ -12,8 +12,8 @@ from tensorflow.keras.callbacks import Callback
 # Set page config
 st.set_page_config(layout="wide", page_title="Apple Stock Prediction")
 
-st.title("🍎 Apple Stock Price Forecast (Next 30 Days)")
-st.write("This app uses a Deep Learning (LSTM) model to forecast stock prices.")
+st.title(" Apple Stock Price Forecast ")
+st.write("Deep Learning (LSTM) model ")
 # 
 
 # --- 1. Load Data ---
@@ -87,7 +87,7 @@ def train_model(X_train, y_train):
     # NOTE: The Callback class is imported globally above.
     class StreamlitCallback(Callback):
         def on_epoch_end(self, epoch, logs=None):
-            progress = (epoch + 1) / 10
+            progress = (epoch + 1) / 20
             progress_bar.progress(min(progress, 1.0))
             status_text.text(f"Training Model... Epoch {epoch+1}/10")
 
